@@ -1432,6 +1432,7 @@ class GroupFLT:
         pixfrac=1,
         make_figure=True,
         fig_xsize=10,
+        write_ctx=False
     ):
         """
         Make model-subtracted drizzled images of each grism / PA
@@ -1455,6 +1456,9 @@ class GroupFLT:
 
         fig_xsize : float
             Size of the figure.
+
+        write_ctx : bool
+            Write the context image to the FITS header.
 
         Note: Some of this documentation is AI-generated and will be reviewed.
         """
@@ -1483,9 +1487,10 @@ class GroupFLT:
                 ]
 
                 wht_list = [
-                    (self.FLTs[i].grism["DQ"] == 0) / self.FLTs[i].grism["ERR"] ** 2
+                    (self.FLTs[i].grism['DQ'] == 0) / self.FLTs[i].grism['ERR']**2
                     for i in idx
                 ]
+                
                 for i in range(N):
                     mask = ~np.isfinite(wht_list[i])
                     wht_list[i][mask] = 0
@@ -1507,9 +1512,14 @@ class GroupFLT:
                     pixfrac=pixfrac,
                 )
 
-                outsci, _, _, header, outputwcs = out
+                outsci, _, _, outctx, header, outputwcs = out
                 header["FILTER"] = g
                 header["PA"] = pa
+
+                # Add invidual FLTs to header
+                for i, ix in enumerate(idx):
+                    header[f'FLT{str(i+1).zfill(5)}'] = self.FLTs[ix].grism_file
+
                 pyfits.writeto(
                     outfile,
                     data=outsci,
@@ -1517,6 +1527,10 @@ class GroupFLT:
                     overwrite=True,
                     output_verify="fix",
                 )
+
+                if write_ctx:
+                    pyfits.writeto(outfile.replace('sci', 'ctx'), data=outctx,
+                                header=header, overwrite=True, output_verify='fix')
 
                 # Model-subtracted
                 outfile = "{0}-{1}-{2}_grism_clean.fits".format(root, g.lower(), pa)
